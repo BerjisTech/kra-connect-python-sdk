@@ -5,7 +5,12 @@
 [![PyPI version](https://badge.fury.io/py/kra-connect.svg)](https://badge.fury.io/py/kra-connect)
 [![Python Versions](https://img.shields.io/pypi/pyversions/kra-connect.svg)](https://pypi.org/project/kra-connect/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Coverage](https://img.shields.io/codecov/c/github/your-org/kra-connect)](https://codecov.io/gh/your-org/kra-connect)
+
+## Repository
+
+- **GitHub**: [BerjisTech/kra-connect-python-sdk](https://github.com/BerjisTech/kra-connect-python-sdk)
+- **PyPI**: [kra-connect](https://pypi.org/project/kra-connect/)
+- **Documentation**: [https://docs.kra-connect.dev/python](https://docs.kra-connect.dev/python)
 
 ## Features
 
@@ -383,20 +388,59 @@ make html
 # Open docs/_build/html/index.html
 ```
 
+## Publishing
+
+### Publishing to PyPI
+
+```bash
+# Install build tools
+pip install build twine
+
+# Update version in pyproject.toml
+# Update CHANGELOG.md
+
+# Build the distribution
+python -m build
+
+# Check the distribution
+twine check dist/*
+
+# Upload to TestPyPI (optional)
+twine upload --repository testpypi dist/*
+
+# Upload to PyPI
+twine upload dist/*
+```
+
+### GitHub Release
+
+```bash
+# Tag the release
+git tag -a v1.0.0 -m "Release version 1.0.0"
+git push origin v1.0.0
+
+# Create GitHub release from tag
+gh release create v1.0.0 --title "v1.0.0" --notes "Release notes here"
+```
+
 ## Contributing
 
-See [CONTRIBUTING.md](../../CONTRIBUTING.md) for contribution guidelines.
+Contributions are welcome! Please:
+
+1. Fork the repository: [BerjisTech/kra-connect-python-sdk](https://github.com/BerjisTech/kra-connect-python-sdk)
+2. Create a feature branch
+3. Make your changes with tests
+4. Submit a pull request
 
 ## License
 
-MIT License - see [LICENSE](../../LICENSE) for details.
+MIT License - see [LICENSE](./LICENSE) for details.
 
 ## Support
 
 - **Documentation**: [https://docs.kra-connect.dev/python](https://docs.kra-connect.dev/python)
-- **Issues**: [GitHub Issues](https://github.com/your-org/kra-connect/issues)
-- **Discord**: [Join our community](https://discord.gg/kra-connect)
-- **Email**: support@kra-connect.dev
+- **Issues**: [GitHub Issues](https://github.com/BerjisTech/kra-connect-python-sdk/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/BerjisTech/kra-connect-python-sdk/discussions)
 
 ## Changelog
 

@@ -6,6 +6,7 @@
 @created 2025-01-15
 """
 
+import asyncio
 import logging
 from typing import Optional, List
 from datetime import datetime
@@ -609,3 +610,178 @@ class AsyncKraClient:
         except Exception as e:
             logger.error(f"Unexpected error during async PIN verification: {e}")
             raise KraConnectError(f"PIN verification failed: {str(e)}")
+
+    async def verify_tcc(self, tcc_number: str) -> TccVerificationResult:
+        """
+        Asynchronously verify a Tax Compliance Certificate.
+        """
+        normalized_tcc = validate_tcc_format(tcc_number)
+        logger.info(f"Async verifying TCC: {normalized_tcc}")
+
+        cache_key = self.cache_manager.generate_key("tcc", tcc_number=normalized_tcc)
+        cached_result = self.cache_manager.get(cache_key)
+        if cached_result:
+            return cached_result
+
+        await self.rate_limiter.acquire_async()
+
+        try:
+            response_data = await self.http_client.post(
+                "/verify-tcc",
+                json_data={"tcc": normalized_tcc}
+            )
+
+            result = TccVerificationResult(
+                tcc_number=normalized_tcc,
+                is_valid=response_data.get("valid", False),
+                pin_number=response_data.get("pin_number"),
+                taxpayer_name=response_data.get("taxpayer_name"),
+                issue_date=response_data.get("issue_date"),
+                expiry_date=response_data.get("expiry_date"),
+                certificate_type=response_data.get("certificate_type"),
+                status=response_data.get("status"),
+            )
+
+            self.cache_manager.set(cache_key, result)
+            logger.info(f"Async TCC verification completed: {normalized_tcc}")
+            return result
+
+        except KraConnectError:
+            raise
+        except Exception as e:
+            logger.error(f"Unexpected error during async TCC verification: {e}")
+            raise KraConnectError(f"TCC verification failed: {str(e)}")
+
+    async def validate_eslip(self, slip_number: str) -> EslipValidationResult:
+        """
+        Asynchronously validate an electronic payment slip.
+        """
+        normalized_slip = validate_eslip_number(slip_number)
+        logger.info(f"Async validating e-slip: {normalized_slip}")
+
+        await self.rate_limiter.acquire_async()
+
+        try:
+            response_data = await self.http_client.post(
+                "/validate-eslip",
+                json_data={"slip_number": normalized_slip}
+            )
+
+            result = EslipValidationResult(
+                slip_number=normalized_slip,
+                is_valid=response_data.get("valid", False),
+                pin_number=response_data.get("pin_number"),
+                amount=response_data.get("amount"),
+                payment_date=response_data.get("payment_date"),
+                payment_reference=response_data.get("payment_reference"),
+                obligation_type=response_data.get("obligation_type"),
+                tax_period=response_data.get("tax_period"),
+                status=response_data.get("status"),
+            )
+
+            logger.info(f"Async e-slip validation completed: {normalized_slip}")
+            return result
+
+        except KraConnectError:
+            raise
+        except Exception as e:
+            logger.error(f"Unexpected error during async e-slip validation: {e}")
+            raise KraConnectError(f"E-slip validation failed: {str(e)}")
+
+    async def file_nil_return(
+        self,
+        pin_number: str,
+        period: str,
+        obligation_id: str
+    ) -> NilReturnResult:
+        """
+        Asynchronously file a NIL return.
+        """
+        normalized_pin = validate_pin_format(pin_number)
+        validated_period = validate_period_format(period)
+        validated_obligation_id = validate_obligation_id(obligation_id)
+
+        logger.info(
+            f"Async NIL return filing for PIN: {mask_pin(normalized_pin)}, "
+            f"period: {validated_period}"
+        )
+
+        await self.rate_limiter.acquire_async()
+
+        try:
+            response_data = await self.http_client.post(
+                "/file-nil-return",
+                json_data={
+                    "pin": normalized_pin,
+                    "period": validated_period,
+                    "obligation_id": validated_obligation_id,
+                }
+            )
+
+            result = NilReturnResult(
+                pin_number=normalized_pin,
+                period=validated_period,
+                obligation_id=validated_obligation_id,
+                submission_reference=response_data.get("submission_reference"),
+                submission_date=response_data.get("submission_date"),
+                is_successful=response_data.get("success", False),
+                acknowledgement_receipt=response_data.get("acknowledgement_receipt"),
+            )
+
+            logger.info(f"Async NIL return filing completed: {mask_pin(normalized_pin)}")
+            return result
+
+        except KraConnectError:
+            raise
+        except Exception as e:
+            logger.error(f"Unexpected error during async NIL return filing: {e}")
+            raise KraConnectError(f"NIL return filing failed: {str(e)}")
+
+    async def get_taxpayer_details(self, pin_number: str) -> TaxpayerDetails:
+        """
+        Asynchronously retrieve taxpayer details.
+        """
+        normalized_pin = validate_pin_format(pin_number)
+        logger.info(f"Async taxpayer details for PIN: {mask_pin(normalized_pin)}")
+
+        cache_key = self.cache_manager.generate_key("taxpayer", pin_number=normalized_pin)
+        cached_result = self.cache_manager.get(cache_key)
+        if cached_result:
+            return cached_result
+
+        await self.rate_limiter.acquire_async()
+
+        try:
+            response_data = await self.http_client.get(
+                f"/taxpayer-details/{normalized_pin}"
+            )
+
+            result = TaxpayerDetails(**response_data)
+            self.cache_manager.set(cache_key, result, ttl=1800)
+            logger.info(f"Async taxpayer details retrieved: {mask_pin(normalized_pin)}")
+            return result
+
+        except KraConnectError:
+            raise
+        except Exception as e:
+            logger.error(f"Unexpected error retrieving async taxpayer details: {e}")
+            raise KraConnectError(f"Failed to retrieve taxpayer details: {str(e)}")
+
+    async def verify_pins_batch(self, pin_numbers: List[str]) -> List[PinVerificationResult]:
+        """
+        Asynchronously verify multiple PINs concurrently.
+        """
+
+        async def _verify(pin: str) -> PinVerificationResult:
+            try:
+                return await self.verify_pin(pin)
+            except Exception as exc:
+                logger.error(f"Error verifying PIN {mask_pin(pin)}: {exc}")
+                return PinVerificationResult(
+                    pin_number=pin,
+                    is_valid=False,
+                    error_message=str(exc)
+                )
+
+        tasks = [_verify(pin) for pin in pin_numbers]
+        return await asyncio.gather(*tasks)

@@ -114,21 +114,41 @@ client = KraClient()  # Reads from environment variables
 ### Custom Configuration
 
 ```python
-from kra_connect import KraClient, KraConfig
+from kra_connect import (
+    KraClient,
+    KraConfig,
+    RetryConfig,
+    CacheConfig,
+    RateLimitConfig,
+)
 
 config = KraConfig(
     api_key="your_api_key_here",
     base_url="https://api.kra.go.ke/gavaconnect/v1",
-    timeout=30,
-    max_retries=3,
-    cache_enabled=True,
-    cache_ttl=3600,
-    rate_limit_max_requests=100,
-    rate_limit_window_seconds=60
+    timeout=45,
+    retry_config=RetryConfig(max_attempts=5, initial_delay=1.0),
+    cache_config=CacheConfig(enabled=True, ttl=3600, max_size=2000),
+    rate_limit_config=RateLimitConfig(max_requests=150, window_seconds=60),
 )
 
 client = KraClient(config=config)
 ```
+
+### Command-Line Interface
+
+The SDK ships with a lightweight CLI once installed:
+
+```bash
+kra verify-pin P051234567A --api-key your_api_key
+kra verify-tcc TCC123456
+kra validate-eslip 1234567890
+kra file-nil-return P051234567A OBL123456 202401
+kra taxpayer-details P051234567A
+```
+
+Flags:
+- `--api-key` overrides `KRA_API_KEY`
+- `--base-url` and `--timeout` let you target sandbox/staging endpoints
 
 ## API Reference
 

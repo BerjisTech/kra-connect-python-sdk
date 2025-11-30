@@ -12,6 +12,7 @@ import json
 import logging
 from typing import Optional, Any, Dict
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 
 from cachetools import TTLCache
 
@@ -155,6 +156,17 @@ class MemoryCacheBackend(CacheBackend):
             logger.warning(f"Error clearing cache: {e}")
 
 
+@dataclass
+class CacheEntry:
+    """Container for cached values with per-item TTL support."""
+
+    value: Any
+    expires_at: float
+
+    def is_expired(self) -> bool:
+        return time.time() >= self.expires_at
+
+
 class CacheManager:
     """
     Manages caching operations for API responses.
@@ -229,7 +241,18 @@ class CacheManager:
             return None
 
         try:
-            return self.backend.get(key)
+            entry = self.backend.get(key)
+            if entry is None:
+                return None
+
+            if isinstance(entry, CacheEntry):
+                if entry.is_expired():
+                    logger.debug(f"Cache entry expired for key: {key}")
+                    self.delete(key)
+                    return None
+                return entry.value
+
+            return entry
         except CacheError as e:
             logger.warning(f"Cache error: {e}")
             return None
@@ -250,9 +273,13 @@ class CacheManager:
             return
 
         ttl = ttl or self.config.ttl
+        if ttl <= 0:
+            logger.debug("Skipping cache set due to non-positive TTL")
+            return
 
+        entry = CacheEntry(value=value, expires_at=time.time() + ttl)
         try:
-            self.backend.set(key, value, ttl)
+            self.backend.set(key, entry, ttl)
         except CacheError as e:
             logger.warning(f"Cache error: {e}")
 
@@ -310,11 +337,11 @@ class CacheManager:
             >>> result = cache_manager.get_or_set("pin:P051234567A", fetch_pin_data)
         """
         # Try to get from cache
-        value = self.get(key)
+        cached_value = self.get(key)
 
-        if value is not None:
+        if cached_value is not None:
             logger.debug(f"Cache hit for key: {key}")
-            return value
+            return cached_value
 
         # Cache miss - compute value
         logger.debug(f"Cache miss for key: {key}, computing value")

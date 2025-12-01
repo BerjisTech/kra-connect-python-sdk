@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "kra-connect"
-version = "0.1.0"
+version = "0.1.1"
 description = "Official Python SDK for KRA GavaConnect API - Tax compliance and verification for Kenya"
 authors = ["KRA-Connect Team <developers@kra-connect.dev>"]
 license = "MIT"
